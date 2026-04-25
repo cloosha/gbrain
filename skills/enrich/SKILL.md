@@ -99,6 +99,8 @@ For each entity:
 - **If yes:** UPDATE path (add new signal, update compiled truth if material)
 - **If no:** CREATE path (check notability gate first, then create)
 
+> **Filing rule:** Apply the notability gate from `skills/_brain-filing-rules.md`.
+
 ### Step 3: Extract signal from source
 
 Don't just capture facts. Capture texture:
