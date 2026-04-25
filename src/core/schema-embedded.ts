@@ -84,7 +84,15 @@ CREATE INDEX IF NOT EXISTS idx_pages_trgm ON pages USING GIN(title gin_trgm_ops)
 -- v0.13.1 #170: avoids 14.6s seqscan on large brains when listing pages newest-first.
 CREATE INDEX IF NOT EXISTS idx_pages_updated_at_desc ON pages (updated_at DESC);
 -- v0.18.0: source-scoped scans (per /plan-eng-review Section 4).
-CREATE INDEX IF NOT EXISTS idx_pages_source_id ON pages(source_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'pages' AND column_name = 'source_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_pages_source_id ON pages(source_id);
+  END IF;
+END $$;
 
 -- ============================================================
 -- content_chunks: chunked content with embeddings
@@ -234,8 +242,21 @@ CREATE TABLE IF NOT EXISTS links (
 
 CREATE INDEX IF NOT EXISTS idx_links_from ON links(from_page_id);
 CREATE INDEX IF NOT EXISTS idx_links_to ON links(to_page_id);
-CREATE INDEX IF NOT EXISTS idx_links_source ON links(link_source);
-CREATE INDEX IF NOT EXISTS idx_links_origin ON links(origin_page_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'links' AND column_name = 'link_source'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_links_source ON links(link_source);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'links' AND column_name = 'origin_page_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_links_origin ON links(origin_page_id);
+  END IF;
+END $$;
 
 -- ============================================================
 -- tags
@@ -381,8 +402,21 @@ CREATE TABLE IF NOT EXISTS files (
 ALTER TABLE files DROP COLUMN IF EXISTS storage_url;
 
 CREATE INDEX IF NOT EXISTS idx_files_page ON files(page_slug);
-CREATE INDEX IF NOT EXISTS idx_files_page_id ON files(page_id);
-CREATE INDEX IF NOT EXISTS idx_files_source_id ON files(source_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'files' AND column_name = 'page_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_files_page_id ON files(page_id);
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'files' AND column_name = 'source_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_files_source_id ON files(source_id);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_files_hash ON files(content_hash);
 
 -- ============================================================
