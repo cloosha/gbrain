@@ -30,6 +30,8 @@ writes_to:
   - sources/
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Media Ingest Skill
 
 Ingest video, audio, PDF, book, screenshot, and GitHub repo content into the brain.

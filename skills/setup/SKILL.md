@@ -13,6 +13,8 @@ tools:
 mutating: true
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Setup GBrain
 
 Set up GBrain from scratch. Target: working brain in under 5 minutes.

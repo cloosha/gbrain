@@ -27,6 +27,8 @@ writes_to:
   - sources/
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Idea Ingest Skill
 
 > **Filing rule:** Read `skills/_brain-filing-rules.md` before creating any new page.

@@ -25,6 +25,8 @@ writes_to:
   - companies/
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Meeting Ingestion Skill
 
 > **Filing rule:** Read `skills/_brain-filing-rules.md` before creating any new page.

@@ -26,6 +26,8 @@ writes_to:
   - companies/
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Enrich Skill
 
 Enrich person and company pages from external sources. Scale effort to importance.

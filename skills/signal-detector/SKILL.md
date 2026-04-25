@@ -22,6 +22,8 @@ writes_to:
   - concepts/
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Signal Detector — Ambient Brain Capture
 
 Lightweight sub-agent that fires on every inbound message to capture TWO things

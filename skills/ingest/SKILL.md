@@ -22,6 +22,8 @@ writes_to:
   - sources/
 ---
 
+Cross-cutting quality rules are centralized in `skills/conventions/quality.md`.
+
 # Ingest Skill
 
 Ingest meetings, articles, media, documents, and conversations into the brain.
