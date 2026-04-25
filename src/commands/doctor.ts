@@ -553,32 +553,32 @@ export async function runDoctor(engine: BrainEngine | null, args: string[], dbSo
   }
 
   // 9. Integrity sample scan (v0.13 knowledge runtime).
-  // Read-only — no network, no writes, no resolver calls. Samples the first
-  // 500 pages by slug order and surfaces bare-tweet + dead-link counts as a
-  // warning. Full-brain scan: `gbrain integrity check`.
+  // Read-only — no network, no writes, no resolver calls. Inspects a bounded
+  // 500 slug candidates by slug order and surfaces bare-tweet + dead-link
+  // counts as a warning. Full-brain scan: `gbrain integrity check`.
   progress.heartbeat('integrity_sample');
   const integrityHb = startHeartbeat(progress, 'scanning 500-page integrity sample…');
   try {
     const { scanIntegrity } = await import('./integrity.ts');
-    const res = await scanIntegrity(engine, { limit: 500 });
+    const res = await scanIntegrity(engine, { limit: 500, maxCandidates: 500 });
     const total = res.bareHits.length + res.externalHits.length;
     if (total === 0) {
       checks.push({
         name: 'integrity',
         status: 'ok',
-        message: `Sampled ${res.pagesScanned} pages; no bare-tweet phrases or external links.`,
+        message: `Sampled ${res.pagesScanned} pages from ${res.pagesConsidered} candidate(s); no bare-tweet phrases or external links.`,
       });
     } else if (res.bareHits.length > 0) {
       checks.push({
         name: 'integrity',
         status: 'warn',
-        message: `Sampled ${res.pagesScanned} pages; ${res.bareHits.length} bare-tweet phrase(s), ${res.externalHits.length} external link(s). Run: gbrain integrity check (or integrity auto to repair).`,
+        message: `Sampled ${res.pagesScanned} pages from ${res.pagesConsidered} candidate(s); ${res.bareHits.length} bare-tweet phrase(s), ${res.externalHits.length} external link(s). Run: gbrain integrity check (or integrity auto to repair).`,
       });
     } else {
       checks.push({
         name: 'integrity',
         status: 'ok',
-        message: `Sampled ${res.pagesScanned} pages; ${res.externalHits.length} external link(s) (no bare tweets).`,
+        message: `Sampled ${res.pagesScanned} pages from ${res.pagesConsidered} candidate(s); ${res.externalHits.length} external link(s) (no bare tweets).`,
       });
     }
   } catch (e) {

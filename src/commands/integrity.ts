@@ -265,6 +265,12 @@ async function cmdCheck(args: string[]): Promise<void> {
 export interface IntegrityScanOptions {
   /** Max pages to scan. Default Infinity. Doctor passes a sample limit (~500). */
   limit?: number;
+  /**
+   * Max matching slugs to inspect before stopping. This bounds sampled scans
+   * when most pages are grandfathered with validate:false and therefore do
+   * not count toward `limit`.
+   */
+  maxCandidates?: number;
   /** Slug prefix filter (e.g. "people") — matches slugs starting with `${typeFilter}/`. */
   typeFilter?: string;
   /**
@@ -277,6 +283,8 @@ export interface IntegrityScanOptions {
 
 export interface IntegrityScanResult {
   pagesScanned: number;
+  pagesConsidered: number;
+  pagesSkippedGrandfathered: number;
   bareHits: BareTweetHit[];
   externalHits: ExternalLinkHit[];
   /** Top 10 pages sorted by bare-tweet hit count, descending. */
@@ -294,7 +302,7 @@ export async function scanIntegrity(
   engine: BrainEngine,
   opts: IntegrityScanOptions = {},
 ): Promise<IntegrityScanResult> {
-  const { limit = Infinity, typeFilter, batchLoad = true } = opts;
+  const { limit = Infinity, maxCandidates = Infinity, typeFilter, batchLoad = true } = opts;
 
   // Fast path: single SQL query instead of N sequential getPage() calls.
   // Eliminates ~500 round-trips through PgBouncer that caused doctor to
@@ -322,14 +330,21 @@ export async function scanIntegrity(
   const bareHits: BareTweetHit[] = [];
   const externalHits: ExternalLinkHit[] = [];
   let pagesScanned = 0;
+  let pagesConsidered = 0;
+  let pagesSkippedGrandfathered = 0;
 
   for (const slug of allSlugs) {
     if (typeFilter && !slug.startsWith(`${typeFilter}/`)) continue;
+    if (pagesConsidered >= maxCandidates) break;
     if (pagesScanned >= limit) break;
+    pagesConsidered++;
     const page = await engine.getPage(slug);
     if (!page) continue;
     // Skip grandfathered pages (opted out of brain-integrity enforcement)
-    if ((page.frontmatter as Record<string, unknown> | undefined)?.validate === false) continue;
+    if ((page.frontmatter as Record<string, unknown> | undefined)?.validate === false) {
+      pagesSkippedGrandfathered++;
+      continue;
+    }
     pagesScanned++;
     bareHits.push(...findBareTweetHits(page.compiled_truth, slug));
     externalHits.push(...findExternalLinks(page.compiled_truth, slug));
@@ -342,7 +357,7 @@ export async function scanIntegrity(
     .slice(0, 10)
     .map(([slug, count]) => ({ slug, count }));
 
-  return { pagesScanned, bareHits, externalHits, topPages };
+  return { pagesScanned, pagesConsidered, pagesSkippedGrandfathered, bareHits, externalHits, topPages };
 }
 
 /**

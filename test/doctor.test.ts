@@ -83,6 +83,12 @@ describe('doctor command', () => {
     expect(source).toContain('GBRAIN_DATABASE_URL');
   });
 
+  test('doctor integrity sample is bounded by candidate count', async () => {
+    const source = await Bun.file(new URL('../src/commands/doctor.ts', import.meta.url)).text();
+    expect(source).toContain('maxCandidates: 500');
+    expect(source).toContain('from ${res.pagesConsidered} candidate(s)');
+  });
+
   // v0.12.2 reliability wave — doctor detects JSONB double-encode + truncated
   // bodies and points users at the standalone `gbrain repair-jsonb` command.
   // Detection only; repair lives in src/commands/repair-jsonb.ts.

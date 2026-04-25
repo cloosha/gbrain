@@ -228,6 +228,18 @@ describe('scanIntegrity', () => {
     expect(res.pagesScanned).toBe(1);
   });
 
+  test('honors maxCandidates even when pages are grandfathered', async () => {
+    const res = await scanIntegrity(engine, { limit: 500, maxCandidates: 1 });
+    expect(res.pagesConsidered).toBe(1);
+    expect(res.pagesScanned).toBeLessThanOrEqual(1);
+  });
+
+  test('reports grandfathered skips separately from scanned pages', async () => {
+    const res = await scanIntegrity(engine);
+    expect(res.pagesConsidered).toBeGreaterThan(res.pagesScanned);
+    expect(res.pagesSkippedGrandfathered).toBe(1);
+  });
+
   test('honors typeFilter prefix match', async () => {
     const res = await scanIntegrity(engine, { typeFilter: 'companies' });
     expect(res.pagesScanned).toBe(0);
