@@ -7,6 +7,7 @@ import { importFile } from '../core/import-file.ts';
 import { loadConfig } from '../core/config.ts';
 import { createProgress } from '../core/progress.ts';
 import { getCliOptions, cliOptsToProgressOptions } from '../core/cli-options.ts';
+import { isSyncable } from '../core/sync.ts';
 
 function defaultWorkers(): number {
   const cpuCount = cpus().length;
@@ -295,7 +296,7 @@ export function collectMarkdownFiles(dir: string): string[] {
 
       if (stat.isDirectory()) {
         walk(full);
-      } else if (entry.endsWith('.md') || entry.endsWith('.mdx')) {
+      } else if ((entry.endsWith('.md') || entry.endsWith('.mdx')) && isSyncable(relative(dir, full))) {
         files.push(full);
       }
     }

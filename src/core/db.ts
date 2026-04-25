@@ -13,7 +13,7 @@ let connectedUrl: string | null = null;
  * MaxClients errors when `gbrain upgrade` spawns subprocesses that each open
  * their own pool. Set `GBRAIN_POOL_SIZE=2` (or similar) before the command.
  */
-const DEFAULT_POOL_SIZE_FALLBACK = 10;
+const DEFAULT_POOL_SIZE_FALLBACK = 2;
 
 /**
  * Supabase PgBouncer transaction-mode convention: port 6543 routes through
@@ -64,12 +64,12 @@ export function resolvePrepare(url: string): boolean | undefined {
 }
 
 export function resolvePoolSize(explicit?: number): number {
-  if (typeof explicit === 'number' && explicit > 0) return explicit;
-  const raw = process.env.GBRAIN_POOL_SIZE;
+  const raw = process.env.GBRAIN_POOL_SIZE || process.env.GBRAIN_DB_POOL_SIZE;
   if (raw) {
     const parsed = parseInt(raw, 10);
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
   }
+  if (typeof explicit === 'number' && explicit > 0) return explicit;
   return DEFAULT_POOL_SIZE_FALLBACK;
 }
 
@@ -148,6 +148,13 @@ export async function setSessionDefaults(_sql: ReturnType<typeof postgres>): Pro
   // No-op: timeouts are now applied as startup parameters in resolveSessionTimeouts().
 }
 
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export function getConnection(): ReturnType<typeof postgres> {
   if (!sql) {
     throw new GBrainError(
@@ -183,7 +190,7 @@ export async function connect(config: EngineConfig): Promise<void> {
     const opts: Record<string, unknown> = {
       max: resolvePoolSize(),
       idle_timeout: 20,
-      connect_timeout: 10,
+      connect_timeout: envInt('GBRAIN_DB_CONNECT_TIMEOUT', 30),
       types: {
         // Register pgvector type
         bigint: postgres.BigInt,

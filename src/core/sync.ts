@@ -182,14 +182,23 @@ function matchesAnyGlob(path: string, patterns?: string[]): boolean {
  */
 export function isSyncable(path: string, opts: SyncableOptions = {}): boolean {
   const strategy = opts.strategy || 'markdown';
+  const parts = path.replace(/\\/g, '/').split('/');
 
   if (!isAllowedByStrategy(path, strategy)) return false;
 
   // Skip hidden directories
-  if (path.split('/').some(p => p.startsWith('.'))) return false;
+  if (parts.some(p => p.startsWith('.'))) return false;
+
+  // Quarantine archives are retained on disk for audit/recovery, not active
+  // brain pages. Importing them creates tens of thousands of low-signal pages.
+  if (parts.includes('_quarantine')) return false;
 
   // Skip .raw/ sidecar directories
   if (path.includes('.raw/')) return false;
+
+  // Skip generated/output trees. These can contain large markdown exports of
+  // data that is already represented under brain/ and should not be re-ingested.
+  if (parts[0] === 'export' || parts[0] === 'outputs') return false;
 
   // Skip meta files that aren't pages
   const skipFiles = ['schema.md', 'index.md', 'log.md', 'README.md'];

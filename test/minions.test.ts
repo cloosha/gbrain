@@ -1061,6 +1061,32 @@ describe('MinionWorker: v7 Behavior', () => {
 
     expect(abortFired).toBe(true);
   });
+
+  test('long-running handler survives stall scans when lock duration is extended', async () => {
+    const job = await queue.add('long-cycle', {}, {
+      max_attempts: 1,
+    });
+
+    const worker = new MinionWorker(engine, {
+      concurrency: 1,
+      pollInterval: 25,
+      lockDuration: 1000,
+      stalledInterval: 200,
+    });
+    worker.register('long-cycle', async () => {
+      await new Promise(r => setTimeout(r, 650));
+      return { ok: true };
+    });
+
+    const p = worker.start();
+    await new Promise(r => setTimeout(r, 900));
+    worker.stop();
+    await p;
+
+    const final = await queue.getJob(job.id);
+    expect(final!.status).toBe('completed');
+    expect(final!.error_text).toBeNull();
+  });
 });
 
 // --- v7 Token rollup guard ---

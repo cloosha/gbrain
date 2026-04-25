@@ -32,6 +32,13 @@ import { buildSourceFactorCase, buildHardExcludeClause } from './search/sql-rank
 // See TODOS.md item: "err.code-based connection-error matching" for the
 // follow-up that will reintroduce a typed retry mechanism.
 
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export class PostgresEngine implements BrainEngine {
   readonly kind = 'postgres' as const;
   private _sql: ReturnType<typeof postgres> | null = null;
@@ -69,7 +76,7 @@ export class PostgresEngine implements BrainEngine {
       const opts: Record<string, unknown> = {
         max: size,
         idle_timeout: 20,
-        connect_timeout: 10,
+        connect_timeout: envInt('GBRAIN_DB_CONNECT_TIMEOUT', 30),
         types: { bigint: postgres.BigInt },
       };
       if (Object.keys(timeouts).length > 0) {
@@ -1204,10 +1211,17 @@ export class PostgresEngine implements BrainEngine {
     // Returning 0 rows means either page missing OR duplicate; skipExistenceCheck
     // makes that ambiguity safe (caller asserts page exists).
     await sql`
-      INSERT INTO timeline_entries (page_id, date, source, summary, detail)
-      SELECT id, ${entry.date}::date, ${entry.source || ''}, ${entry.summary}, ${entry.detail || ''}
-      FROM pages WHERE slug = ${slug}
-      ON CONFLICT (page_id, date, summary) DO NOTHING
+      WITH inserted AS (
+        INSERT INTO timeline_entries (page_id, date, source, summary, detail)
+        SELECT id, ${entry.date}::date, ${entry.source || ''}, ${entry.summary}, ${entry.detail || ''}
+        FROM pages WHERE slug = ${slug}
+        ON CONFLICT (page_id, date, summary) DO NOTHING
+        RETURNING page_id, created_at
+      )
+      UPDATE pages p
+      SET updated_at = GREATEST(p.updated_at, inserted.created_at)
+      FROM inserted
+      WHERE p.id = inserted.page_id
     `;
   }
 
@@ -1385,8 +1399,10 @@ export class PostgresEngine implements BrainEngine {
          WHERE p.updated_at < (SELECT MAX(te.created_at) FROM timeline_entries te WHERE te.page_id = p.id)
         ) as stale_pages,
         (SELECT count(*) FROM pages p
-         WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.to_page_id = p.id)
+         WHERE p.type IN ('person', 'company', 'project', 'conference', 'organization', 'note', 'index')
+           AND NOT EXISTS (SELECT 1 FROM links l WHERE l.to_page_id = p.id)
            AND NOT EXISTS (SELECT 1 FROM links l WHERE l.from_page_id = p.id)
+           AND NOT EXISTS (SELECT 1 FROM timeline_entries te WHERE te.page_id = p.id)
         ) as orphan_pages,
         (SELECT count(*) FROM links l
          WHERE NOT EXISTS (SELECT 1 FROM pages p WHERE p.id = l.to_page_id)
@@ -1712,4 +1728,19 @@ function pgRowToCodeEdge(row: Record<string, unknown>): import('./types.ts').Cod
     source_id: row.source_id == null ? null : (row.source_id as string),
     resolved: Boolean(row.resolved),
   };
+}
+
+function parseVector(value: unknown): Float32Array | null {
+  if (!value) return null;
+  if (value instanceof Float32Array) return value;
+  if (Array.isArray(value)) return new Float32Array(value.map(Number));
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    const body = trimmed.startsWith('[') && trimmed.endsWith(']')
+      ? trimmed.slice(1, -1)
+      : trimmed;
+    if (!body) return new Float32Array();
+    return new Float32Array(body.split(',').map(Number));
+  }
+  return null;
 }

@@ -28,6 +28,7 @@ import {
 } from '../core/link-extraction.ts';
 import { createProgress } from '../core/progress.ts';
 import { getCliOptions, cliOptsToProgressOptions } from '../core/cli-options.ts';
+import { isSyncable } from '../core/sync.ts';
 
 // Batch size for addLinksBatch / addTimelineEntriesBatch.
 // Postgres bind-parameter limit is 65535. Links use 4 cols/row → 16K hard ceiling;
@@ -71,7 +72,8 @@ export function walkMarkdownFiles(dir: string): { path: string; relPath: string 
         if (lstatSync(full).isDirectory()) {
           walk(full);
         } else if (entry.endsWith('.md') && !entry.startsWith('_')) {
-          files.push({ path: full, relPath: relative(dir, full) });
+          const relPath = relative(dir, full);
+          if (isSyncable(relPath)) files.push({ path: full, relPath });
         }
       } catch { /* skip unreadable */ }
     }
@@ -260,11 +262,20 @@ export async function extractLinksFromFile(
 export function extractTimelineFromContent(content: string, slug: string): ExtractedTimelineEntry[] {
   const entries: ExtractedTimelineEntry[] = [];
 
-  // Format 1: Bullet — - **YYYY-MM-DD** | Source — Summary
-  const bulletPattern = /^-\s+\*\*(\d{4}-\d{2}-\d{2})\*\*\s*\|\s*(.+?)\s*[—–-]\s*(.+)$/gm;
+  // Support both legacy 3-part bullets and the canonical 2-part form.
+  // The separator requires surrounding whitespace so hyphens inside the
+  // summary are preserved instead of becoming a phantom split point.
+  const bullet3Part = /^\s*-?\s*\*\*(\d{4}-\d{2}-\d{2})\*\*\s*\|\s*(.+?)\s+[—–-]\s+(.+?)\s*$/gm;
+  const bullet2Part = /^\s*-?\s*\*\*(\d{4}-\d{2}-\d{2})\*\*\s*(?:\|\s*|[—–-]\s+)(.+?)\s*$/gm;
+  const matched3PartOffsets = new Set<number>();
   let match;
-  while ((match = bulletPattern.exec(content)) !== null) {
+  while ((match = bullet3Part.exec(content)) !== null) {
+    matched3PartOffsets.add(match.index);
     entries.push({ slug, date: match[1], source: match[2].trim(), summary: match[3].trim() });
+  }
+  while ((match = bullet2Part.exec(content)) !== null) {
+    if (matched3PartOffsets.has(match.index)) continue;
+    entries.push({ slug, date: match[1], source: '', summary: match[2].trim() });
   }
 
   // Format 2: Header — ### YYYY-MM-DD — Title

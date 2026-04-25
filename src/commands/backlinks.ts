@@ -15,6 +15,7 @@ import { join, relative, basename } from 'path';
 import { extractEntityRefs as canonicalExtractEntityRefs } from '../core/link-extraction.ts';
 import { createProgress, startHeartbeat } from '../core/progress.ts';
 import { getCliOptions, cliOptsToProgressOptions } from '../core/cli-options.ts';
+import { isSyncable } from '../core/sync.ts';
 
 interface BacklinkGap {
   /** The page that mentions the entity */
@@ -81,6 +82,7 @@ export function findBacklinkGaps(brainDir: string): BacklinkGap[] {
         walk(full);
       } else if (entry.endsWith('.md') && !entry.startsWith('_')) {
         const relPath = relative(brainDir, full);
+        if (!isSyncable(relPath)) continue;
         try {
           allPages.push({ path: full, relPath, content: readFileSync(full, 'utf-8') });
         } catch { /* skip unreadable */ }

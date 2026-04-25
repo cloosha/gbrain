@@ -315,7 +315,10 @@ HANDLER TYPES (built in)
       if (follow) {
         console.log(`Job #${job.id} submitted (${name}). Executing inline...`);
         // Inline execution: run the job in this process
-        const worker = new MinionWorker(engine, { queue: queueName, pollInterval: 100 });
+        const longCycleOpts = name === 'autopilot-cycle'
+          ? { lockDuration: 300_000, stalledInterval: 60_000 }
+          : {};
+        const worker = new MinionWorker(engine, { queue: queueName, pollInterval: 100, ...longCycleOpts });
 
         // Register built-in handlers
         await registerBuiltinHandlers(worker, engine);

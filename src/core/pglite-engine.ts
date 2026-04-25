@@ -1055,10 +1055,16 @@ export class PGLiteEngine implements BrainEngine {
     // ON CONFLICT DO NOTHING via the (page_id, date, summary) unique index.
     // If insert is a no-op (duplicate), no row is returned; that's intentional.
     await this.db.query(
-      `INSERT INTO timeline_entries (page_id, date, source, summary, detail)
-       SELECT id, $2::date, $3, $4, $5
-       FROM pages WHERE slug = $1
-       ON CONFLICT (page_id, date, summary) DO NOTHING`,
+      `WITH inserted AS (
+         INSERT INTO timeline_entries (page_id, date, source, summary, detail)
+         SELECT id, $2::date, $3, $4, $5
+         FROM pages WHERE slug = $1
+         ON CONFLICT (page_id, date, summary) DO NOTHING
+         RETURNING page_id, created_at
+       )
+       UPDATE pages
+       SET updated_at = MAX(pages.updated_at, (SELECT created_at FROM inserted))
+       WHERE id IN (SELECT page_id FROM inserted)`,
       [slug, entry.date, entry.source || '', entry.summary, entry.detail || '']
     );
   }
@@ -1236,8 +1242,10 @@ export class PGLiteEngine implements BrainEngine {
         -- Bug 11 — orphan = islanded (no inbound AND no outbound).
         -- See BrainHealth.orphan_pages docstring; docs updated to match this.
         (SELECT count(*) FROM pages p
-         WHERE NOT EXISTS (SELECT 1 FROM links l WHERE l.to_page_id = p.id)
+         WHERE p.type IN ('person', 'company', 'project', 'conference', 'organization', 'note', 'index')
+           AND NOT EXISTS (SELECT 1 FROM links l WHERE l.to_page_id = p.id)
            AND NOT EXISTS (SELECT 1 FROM links l WHERE l.from_page_id = p.id)
+           AND NOT EXISTS (SELECT 1 FROM timeline_entries te WHERE te.page_id = p.id)
         ) as orphan_pages,
         (SELECT count(*) FROM links l
          WHERE NOT EXISTS (SELECT 1 FROM pages p WHERE p.id = l.to_page_id)

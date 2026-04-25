@@ -163,6 +163,7 @@ function git(repoPath: string, ...args: string[]): string {
   return execFileSync('git', ['-C', repoPath, ...args], {
     encoding: 'utf-8',
     timeout: 30000,
+    maxBuffer: 50 * 1024 * 1024,
   }).trim();
 }
 

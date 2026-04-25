@@ -33,6 +33,13 @@ function readQuietHoursConfig(job: MinionJob): QuietHoursConfig | null {
   return cfg as unknown as QuietHoursConfig;
 }
 
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /** Per-job in-flight state (isolated per job, not shared on the worker). */
 interface InFlightJob {
   job: MinionJob;
@@ -74,9 +81,9 @@ export class MinionWorker {
     this.opts = {
       queue: opts?.queue ?? 'default',
       concurrency: opts?.concurrency ?? 1,
-      lockDuration: opts?.lockDuration ?? 30000,
-      stalledInterval: opts?.stalledInterval ?? 30000,
-      maxStalledCount: opts?.maxStalledCount ?? 1,
+      lockDuration: opts?.lockDuration ?? envInt('GBRAIN_MINION_LOCK_DURATION_MS', 30000),
+      stalledInterval: opts?.stalledInterval ?? envInt('GBRAIN_MINION_STALLED_INTERVAL_MS', 30000),
+      maxStalledCount: opts?.maxStalledCount ?? envInt('GBRAIN_MINION_MAX_STALLED', 1),
       pollInterval: opts?.pollInterval ?? 5000,
       maxRssMb: opts?.maxRssMb ?? 0,
       getRss: opts?.getRss ?? (() => process.memoryUsage().rss),

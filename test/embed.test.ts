@@ -7,8 +7,10 @@ import type { BrainEngine } from '../src/core/engine.ts';
 let activeEmbedCalls = 0;
 let maxConcurrentEmbedCalls = 0;
 let totalEmbedCalls = 0;
+const ORIGINAL_OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 mock.module('../src/core/embedding.ts', () => ({
+  EMBEDDING_MODEL: 'text-embedding-3-large',
   embedBatch: async (texts: string[]) => {
     activeEmbedCalls++;
     totalEmbedCalls++;
@@ -47,10 +49,16 @@ beforeEach(() => {
   activeEmbedCalls = 0;
   maxConcurrentEmbedCalls = 0;
   totalEmbedCalls = 0;
+  delete process.env.OPENAI_API_KEY;
 });
 
 afterEach(() => {
   delete process.env.GBRAIN_EMBED_CONCURRENCY;
+  if (ORIGINAL_OPENAI_API_KEY) {
+    process.env.OPENAI_API_KEY = ORIGINAL_OPENAI_API_KEY;
+  } else {
+    delete process.env.OPENAI_API_KEY;
+  }
 });
 
 describe('runEmbed --all (parallel)', () => {

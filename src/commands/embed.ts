@@ -244,13 +244,14 @@ async function embedAll(
   // Each worker pulls pages from a shared queue and makes independent
   // embedBatch calls to OpenAI + upsertChunks to the engine.
   //
-  // Default 20: keeps us well under OpenAI's embedding RPM limit
-  // (3000+/min for tier 1 = 50+/sec, 20 parallel is safely below) and
-  // avoids overwhelming postgres connection pools. Users can tune via
-  // GBRAIN_EMBED_CONCURRENCY env var based on their tier/infra.
-  const CONCURRENCY = parseInt(process.env.GBRAIN_EMBED_CONCURRENCY || '20', 10);
+  // Keep the default conservative for Supabase pooler-backed installs.
+  // Users can tune via GBRAIN_EMBED_CONCURRENCY after verifying DB/API headroom.
+  const CONCURRENCY = parseInt(process.env.GBRAIN_EMBED_CONCURRENCY || '4', 10);
+
+  let fatalError: Error | null = null;
 
   async function embedOnePage(page: typeof pages[number]) {
+    if (fatalError) return;
     const chunks = await engine.getChunks(page.slug);
     const toEmbed = chunks; // staleOnly path handled above via embedAllStale
 
@@ -290,7 +291,12 @@ async function embedAll(
       await engine.upsertChunks(page.slug, updated);
       result.embedded += toEmbed.length;
     } catch (e: unknown) {
-      console.error(`\n  Error embedding ${page.slug}: ${e instanceof Error ? e.message : e}`);
+      const err = e instanceof Error ? e : new Error(String(e));
+      console.error(`\n  Error embedding ${page.slug}: ${err.message}`);
+      if (/401 Incorrect API key|403|authentication/i.test(err.message)) {
+        fatalError = err;
+        return;
+      }
     }
 
     processed++;
@@ -306,6 +312,7 @@ async function embedAll(
   let nextIdx = 0;
   async function worker() {
     while (nextIdx < pages.length) {
+      if (fatalError) break;
       const idx = nextIdx++;
       await embedOnePage(pages[idx]);
     }
@@ -313,6 +320,9 @@ async function embedAll(
 
   const numWorkers = Math.min(CONCURRENCY, pages.length);
   await Promise.all(Array.from({ length: numWorkers }, () => worker()));
+  if (fatalError) {
+    throw fatalError;
+  }
 
   // Stdout summary preserved for scripts/tests that grep for counts.
   if (dryRun) {
@@ -388,7 +398,7 @@ async function embedAllStale(
     return;
   }
 
-  const CONCURRENCY = parseInt(process.env.GBRAIN_EMBED_CONCURRENCY || '20', 10);
+  const CONCURRENCY = parseInt(process.env.GBRAIN_EMBED_CONCURRENCY || '4', 10);
   let processed = 0;
 
   async function embedOneSlug(slug: string) {

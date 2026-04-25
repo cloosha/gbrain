@@ -101,12 +101,21 @@ describe('extractLinksFromFile', () => {
 });
 
 describe('extractTimelineFromContent', () => {
-  it('extracts bullet format entries', () => {
+  it('extracts legacy bullet format entries with source and summary', () => {
     const content = `## Timeline\n- **2025-03-18** | Meeting — Discussed partnership`;
     const entries = extractTimelineFromContent(content, 'people/test');
     expect(entries).toHaveLength(1);
     expect(entries[0].date).toBe('2025-03-18');
     expect(entries[0].source).toBe('Meeting');
+    expect(entries[0].summary).toBe('Discussed partnership');
+  });
+
+  it('extracts canonical 2-part bullet entries without inventing a source', () => {
+    const content = `## Timeline\n- **2025-03-18** | Discussed partnership`;
+    const entries = extractTimelineFromContent(content, 'people/test');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].date).toBe('2025-03-18');
+    expect(entries[0].source).toBe('');
     expect(entries[0].summary).toBe('Discussed partnership');
   });
 
@@ -134,6 +143,14 @@ describe('extractTimelineFromContent', () => {
     const content = `- **2025-03-18** | Meeting – Discussed partnership`;
     const entries = extractTimelineFromContent(content, 'test');
     expect(entries).toHaveLength(1);
+  });
+
+  it('preserves hyphens inside summaries', () => {
+    const content = `- **2025-03-18** | Email — Re: Draft - CDLNW (Cuny)`;
+    const entries = extractTimelineFromContent(content, 'test');
+    expect(entries).toHaveLength(1);
+    expect(entries[0].source).toBe('Email');
+    expect(entries[0].summary).toBe('Re: Draft - CDLNW (Cuny)');
   });
 });
 

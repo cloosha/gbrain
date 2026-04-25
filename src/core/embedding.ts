@@ -8,11 +8,15 @@
  */
 
 import OpenAI from 'openai';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 
 const MODEL = 'text-embedding-3-large';
 const DIMENSIONS = 1536;
 const MAX_CHARS = 8000;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = Number(process.env.GBRAIN_EMBED_MAX_RETRIES ?? '2');
+const REQUEST_TIMEOUT_MS = Number(process.env.GBRAIN_EMBED_TIMEOUT_MS ?? '15000');
 const BASE_DELAY_MS = 4000;
 const MAX_DELAY_MS = 120000;
 const BATCH_SIZE = 100;
@@ -21,9 +25,24 @@ let client: OpenAI | null = null;
 
 function getClient(): OpenAI {
   if (!client) {
-    client = new OpenAI();
+    client = new OpenAI({
+      apiKey: configuredOpenAIKey(),
+      timeout: REQUEST_TIMEOUT_MS,
+      maxRetries: 0,
+    });
   }
   return client;
+}
+
+function configuredOpenAIKey(): string | undefined {
+  try {
+    const raw = readFileSync(join(homedir(), '.gbrain', 'config.json'), 'utf-8');
+    const key = JSON.parse(raw).openai_api_key;
+    if (typeof key === 'string' && key.trim()) return key.trim();
+  } catch {
+    // Fall back to the SDK's environment handling below.
+  }
+  return process.env.OPENAI_API_KEY;
 }
 
 export async function embed(text: string): Promise<Float32Array> {
@@ -72,6 +91,9 @@ async function embedBatchWithRetry(texts: string[]): Promise<Float32Array[]> {
       const sorted = response.data.sort((a, b) => a.index - b.index);
       return sorted.map(d => new Float32Array(d.embedding));
     } catch (e: unknown) {
+      if (e instanceof OpenAI.APIError && (e.status === 401 || e.status === 403)) {
+        throw e;
+      }
       if (attempt === MAX_RETRIES - 1) throw e;
 
       // Check for rate limit with Retry-After header

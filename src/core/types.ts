@@ -323,12 +323,9 @@ export interface BrainHealth {
   embed_coverage: number;
   stale_pages: number;
   /**
-   * Islanded pages — zero inbound AND zero outbound links. A hub page
-   * that has references out but no back-references is NOT an orphan under
-   * this definition (it's working as intended as an index). The metric
-   * aims at "pages I forgot to connect to anything", not the stricter
-   * graph-theory "no inbound" definition. Both engines share this
-   * semantics after Bug 11 doc-drift fix.
+   * Actionable curated pages with no links and no structured timeline.
+   * A hub page that has references out but no back-references is not an
+   * orphan under this definition.
    */
   orphan_pages: number;
   missing_embeddings: number;
