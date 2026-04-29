@@ -1030,6 +1030,11 @@ export const MIGRATIONS: Migration[] = [
     // append-only in steady state; the UPDATE takes a row lock per chunk
     // briefly while computing the tsvector.
     sql: `
+      -- Large upgraded brains can exceed managed Postgres defaults
+      -- (Supabase commonly enforces ~2min statement_timeout). This migration
+      -- is an intentional one-time backfill and is idempotent via IS NULL.
+      SET statement_timeout = 0;
+
       UPDATE content_chunks
       SET search_vector =
         setweight(to_tsvector('english', COALESCE(doc_comment, '')), 'A') ||

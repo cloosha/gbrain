@@ -119,6 +119,20 @@ CREATE TABLE IF NOT EXISTS content_chunks (
   search_vector         TSVECTOR
 );
 
+-- Existing brains created before these columns shipped need ALTERs because
+-- CREATE TABLE IF NOT EXISTS does not reconcile column drift. Keep this
+-- before indexes/triggers that reference the columns.
+ALTER TABLE content_chunks
+  ADD COLUMN IF NOT EXISTS language TEXT,
+  ADD COLUMN IF NOT EXISTS symbol_name TEXT,
+  ADD COLUMN IF NOT EXISTS symbol_type TEXT,
+  ADD COLUMN IF NOT EXISTS start_line INTEGER,
+  ADD COLUMN IF NOT EXISTS end_line INTEGER,
+  ADD COLUMN IF NOT EXISTS parent_symbol_path TEXT[],
+  ADD COLUMN IF NOT EXISTS doc_comment TEXT,
+  ADD COLUMN IF NOT EXISTS symbol_name_qualified TEXT,
+  ADD COLUMN IF NOT EXISTS search_vector TSVECTOR;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chunks_page_index ON content_chunks(page_id, chunk_index);
 CREATE INDEX IF NOT EXISTS idx_chunks_page ON content_chunks(page_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON content_chunks USING hnsw (embedding vector_cosine_ops);
