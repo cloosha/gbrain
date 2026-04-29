@@ -403,7 +403,14 @@ async function scanIntegrityBatch(
     .slice(0, 10)
     .map(([slug, count]) => ({ slug, count }));
 
-  return { pagesScanned: rows.length, bareHits, externalHits, topPages };
+  return {
+    pagesScanned: rows.length,
+    pagesConsidered: rows.length,
+    pagesSkippedGrandfathered: 0,
+    bareHits,
+    externalHits,
+    topPages,
+  };
 }
 
 // ---------------------------------------------------------------------------
