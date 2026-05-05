@@ -139,28 +139,51 @@ describe('check-resolvable — unit: resolveSkillsDir', () => {
   });
 
   it('REGRESSION-GATE: returns no_skills_dir error when no --skills-dir and findRepoRoot fails', () => {
-    // Temporarily chdir to a guaranteed-empty tmpdir. findRepoRoot will walk
-    // up and fail to find skills/RESOLVER.md.
+    // Temporarily chdir to a guaranteed-empty tmpdir. Isolate HOME / OPENCLAW_WORKSPACE
+    // too, because developer machines may have a real ~/.openclaw/workspace fallback.
     const empty = mkdtempSync(join(tmpdir(), 'empty-for-resolve-'));
+    const fakeHome = mkdtempSync(join(tmpdir(), 'empty-home-for-resolve-'));
     const original = process.cwd();
+    const prevHome = process.env.HOME;
+    const prevWorkspace = process.env.OPENCLAW_WORKSPACE;
     try {
       process.chdir(empty);
+      process.env.HOME = fakeHome;
+      delete process.env.OPENCLAW_WORKSPACE;
       const r = resolveSkillsDir({ help: false, json: false, fix: false, dryRun: false, verbose: false, strict: false, skillsDir: null });
       expect(r.error).toBe('no_skills_dir');
       expect(r.dir).toBeNull();
       expect(typeof r.message).toBe('string');
     } finally {
       process.chdir(original);
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      if (prevWorkspace === undefined) delete process.env.OPENCLAW_WORKSPACE;
+      else process.env.OPENCLAW_WORKSPACE = prevWorkspace;
       rmSync(empty, { recursive: true, force: true });
+      rmSync(fakeHome, { recursive: true, force: true });
     }
   });
 
   it('finds skills via findRepoRoot when cwd is inside a repo (no --skills-dir)', () => {
-    // Running from this test file — we're inside the real gbrain repo.
-    const r = resolveSkillsDir({ help: false, json: false, fix: false, dryRun: false, verbose: false, strict: false, skillsDir: null });
-    expect(r.error).toBeNull();
-    expect(r.dir).toMatch(/\/skills$/);
-    expect(r.source).toBe('repo_root');
+    // Isolate machine-level OpenClaw fallbacks so this specifically exercises repo-root detection.
+    const fakeHome = mkdtempSync(join(tmpdir(), 'empty-home-for-repo-root-'));
+    const prevHome = process.env.HOME;
+    const prevWorkspace = process.env.OPENCLAW_WORKSPACE;
+    try {
+      process.env.HOME = fakeHome;
+      delete process.env.OPENCLAW_WORKSPACE;
+      const r = resolveSkillsDir({ help: false, json: false, fix: false, dryRun: false, verbose: false, strict: false, skillsDir: null });
+      expect(r.error).toBeNull();
+      expect(r.dir).toMatch(/\/skills$/);
+      expect(r.source).toBe('repo_root');
+    } finally {
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+      if (prevWorkspace === undefined) delete process.env.OPENCLAW_WORKSPACE;
+      else process.env.OPENCLAW_WORKSPACE = prevWorkspace;
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
   });
 
   it('REGRESSION-GATE: --skills-dir override takes precedence over OpenClaw env auto-detection', () => {

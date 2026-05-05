@@ -135,10 +135,10 @@ beforeAll(async () => {
   sharedEngine = new PGLiteEngine();
   await sharedEngine.connect({});
   await sharedEngine.initSchema();
-}, 60_000);
+}, 60_000); // OAuth v25 + full migration chain needs breathing room
 
 afterAll(async () => {
-  await sharedEngine.disconnect();
+  if (sharedEngine) await sharedEngine.disconnect();
 }, 60_000);
 
 beforeEach(() => {
@@ -377,8 +377,8 @@ describe('runCycle — yieldBetweenPhases hook', () => {
         hookCalls++;
       },
     });
-    // 6 phases → 6 yield calls (one after each).
-    expect(hookCalls).toBe(6);
+    // v0.26.5: 9 phases (added `purge`) → 9 yield calls (one after each).
+    expect(hookCalls).toBe(9);
   });
 
   test('hook exceptions do not abort the cycle', async () => {
@@ -388,8 +388,8 @@ describe('runCycle — yieldBetweenPhases hook', () => {
         throw new Error('synthetic hook error');
       },
     });
-    // Cycle still completed all phases.
-    expect(report.phases.length).toBe(6);
+    // Cycle still completed all phases (v0.26.5: 9 with the new purge phase).
+    expect(report.phases.length).toBe(9);
   });
 });
 
